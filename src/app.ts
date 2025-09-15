@@ -47,11 +47,27 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use('/api/chat', chatRoutes);
 app.use('/api/sessions', sessionRoutes);
 
+// Simple root endpoint
+app.get('/', (req, res) => {
+  res.json({
+    message: 'RAG Chatbot Backend API',
+    status: 'running',
+    version: '1.0.0',
+    endpoints: ['/api/health', '/api/chat', '/api/sessions']
+  });
+});
+
 // Health check endpoint
 app.get('/api/health', async (req, res) => {
   try {
     const redisConnected = redisClient.isConnected();
-    const vectorStoreCount = await vectorStoreService.getDocumentCount();
+    let vectorStoreCount = 0;
+    
+    try {
+      vectorStoreCount = await vectorStoreService.getDocumentCount();
+    } catch (error) {
+      logger.warn('Could not get vector store count:', error instanceof Error ? error.message : 'Unknown error');
+    }
     
     res.json({
       status: 'ok',
@@ -121,24 +137,33 @@ app.use('*', (req, res) => {
 // Initialize services and start server
 async function startServer() {
   try {
+    console.log('Starting RAG Chatbot Backend...');
+    
     // Try to initialize Redis (non-blocking)
     try {
       await redisClient.connect();
+      console.log('✅ Redis connected successfully');
       logger.info('Redis connected successfully');
     } catch (error) {
+      console.log('⚠️  Redis connection failed, continuing without Redis:', error instanceof Error ? error.message : 'Unknown error');
       logger.warn('Redis connection failed, continuing without Redis:', error instanceof Error ? error.message : 'Unknown error');
     }
     
     // Try to initialize Vector Store (non-blocking)
     try {
       await vectorStoreService.initialize();
+      console.log('✅ Vector store initialized successfully');
       logger.info('Vector store initialized successfully');
     } catch (error) {
+      console.log('⚠️  Vector store initialization failed, continuing without vector store:', error instanceof Error ? error.message : 'Unknown error');
       logger.warn('Vector store initialization failed, continuing without vector store:', error instanceof Error ? error.message : 'Unknown error');
     }
     
     // Start server
     server.listen(config.port, () => {
+      console.log(`🚀 Server running on port ${config.port}`);
+      console.log(`📦 Environment: ${config.nodeEnv}`);
+      console.log(`🔗 API endpoints available at http://localhost:${config.port}/api`);
       logger.info(`Server running on port ${config.port}`);
       logger.info(`Environment: ${config.nodeEnv}`);
       logger.info(`API endpoints available at http://localhost:${config.port}/api`);
