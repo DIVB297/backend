@@ -18,7 +18,7 @@ class RedisClient {
           host: config.redis.host,
           port: config.redis.port,
         },
-        password: config.redis.password || undefined,
+        // Remove password requirement for simplicity
       });
     }
 
