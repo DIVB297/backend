@@ -15,18 +15,30 @@ import { sessionRoutes } from './routes/sessionRoutes';
 
 const app = express();
 const server = createServer(app);
+
+// Define allowed origins for CORS
+const allowedOrigins: string[] = [
+  'http://localhost:3000',
+  'http://localhost:3001', 
+  'https://helpful-vitality-production-9c74.up.railway.app',
+  process.env.RAILWAY_SERVICE_HELPFUL_VITALITY_URL ? `https://${process.env.RAILWAY_SERVICE_HELPFUL_VITALITY_URL}` : undefined
+].filter((origin): origin is string => Boolean(origin));
+
 const io = new Server(server, {
   cors: {
-    origin: process.env.NODE_ENV === 'production' ? false : '*',
+    origin: allowedOrigins,
     methods: ['GET', 'POST'],
+    credentials: true,
   },
 });
 
 // Security middleware
 app.use(helmet());
 app.use(cors({
-  origin: config.nodeEnv === 'production' ? false : true,
+  origin: allowedOrigins,
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
 // Rate limiting
