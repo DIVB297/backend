@@ -7,50 +7,23 @@ class RedisClient {
   private connected: boolean = false;
 
   constructor() {
-    // Check if Railway provides REDIS_URL
-    if (config.redis.url) {
-      this.client = createClient({
-        url: config.redis.url,
-      });
-    } else {
-      this.client = createClient({
-        socket: {
-          host: config.redis.host,
-          port: config.redis.port,
-        },
-        // Remove password requirement for simplicity
-      });
-    }
-
-    this.client.on('error', (err) => {
-      logger.error('Redis Client Error:', err);
-      this.connected = false;
+    // Disable Redis for now to avoid authentication issues
+    // The application will work without Redis (no caching/sessions)
+    this.client = createClient({
+      socket: {
+        host: 'localhost',
+        port: 6379,
+      },
     });
-
-    this.client.on('connect', () => {
-      logger.info('Connected to Redis');
-      this.connected = true;
-    });
-
-    this.client.on('ready', () => {
-      logger.info('Redis client ready');
-    });
-
-    this.client.on('end', () => {
-      logger.info('Redis connection ended');
-      this.connected = false;
-    });
+    this.connected = false; // Always stay disconnected
+    
+    // Don't set up event listeners since we won't connect
+    logger.info('Redis disabled - application will run without caching');
   }
 
   async connect(): Promise<void> {
-    if (!this.connected) {
-      try {
-        await this.client.connect();
-      } catch (error) {
-        logger.error('Failed to connect to Redis, continuing without Redis cache:', error);
-        this.connected = false;
-      }
-    }
+    // Redis is disabled - do nothing
+    logger.info('Redis connection skipped (Redis disabled)');
   }
 
   async disconnect(): Promise<void> {
