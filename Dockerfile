@@ -1,5 +1,5 @@
-# Use Node.js official image
-FROM node:20-alpine
+# Multi-stage build for production optimization
+FROM node:20-alpine AS builder
 
 # Set working directory
 WORKDIR /app
@@ -7,7 +7,7 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies including devDependencies for build
+# Install all dependencies (including dev dependencies for build)
 RUN npm ci
 
 # Copy source code
@@ -16,8 +16,31 @@ COPY . .
 # Build TypeScript
 RUN npm run build
 
-# Remove devDependencies to reduce image size
-RUN npm prune --omit=dev
+# Production stage
+FROM node:20-alpine AS production
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install only production dependencies
+RUN npm ci --only=production && npm cache clean --force
+
+# Copy built application from builder stage
+COPY --from=builder /app/dist ./dist
+
+# Copy any other necessary files
+COPY --from=builder /app/src ./src
+
+# Create a non-root user
+RUN addgroup -g 1001 -S nodejs
+RUN adduser -S nodeuser -u 1001
+
+# Change ownership of the app directory
+RUN chown -R nodeuser:nodejs /app
+USER nodeuser
 
 # Expose port
 EXPOSE 3001
