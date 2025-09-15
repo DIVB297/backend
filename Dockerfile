@@ -32,10 +32,6 @@ RUN npm ci --only=production && npm cache clean --force
 # Copy built application from builder stage
 COPY --from=builder /app/dist ./dist
 
-# Copy startup script
-COPY start.sh ./start.sh
-RUN chmod +x start.sh
-
 # Create a non-root user
 RUN addgroup -g 1001 -S nodejs
 RUN adduser -S nodeuser -u 1001
@@ -48,4 +44,4 @@ USER nodeuser
 EXPOSE 3001
 
 # Start the application
-CMD ["./start.sh"]
+CMD ["node", "dist/app.js"]
