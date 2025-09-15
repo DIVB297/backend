@@ -121,11 +121,21 @@ app.use('*', (req, res) => {
 // Initialize services and start server
 async function startServer() {
   try {
-    // Initialize Redis
-    await redisClient.connect();
+    // Try to initialize Redis (non-blocking)
+    try {
+      await redisClient.connect();
+      logger.info('Redis connected successfully');
+    } catch (error) {
+      logger.warn('Redis connection failed, continuing without Redis:', error instanceof Error ? error.message : 'Unknown error');
+    }
     
-    // Initialize Vector Store
-    await vectorStoreService.initialize();
+    // Try to initialize Vector Store (non-blocking)
+    try {
+      await vectorStoreService.initialize();
+      logger.info('Vector store initialized successfully');
+    } catch (error) {
+      logger.warn('Vector store initialization failed, continuing without vector store:', error instanceof Error ? error.message : 'Unknown error');
+    }
     
     // Start server
     server.listen(config.port, () => {
@@ -147,7 +157,11 @@ process.on('SIGTERM', async () => {
     logger.info('HTTP server closed');
   });
   
-  await redisClient.disconnect();
+  try {
+    await redisClient.disconnect();
+  } catch (error) {
+    logger.warn('Error disconnecting Redis:', error instanceof Error ? error.message : 'Unknown error');
+  }
   process.exit(0);
 });
 
@@ -158,7 +172,11 @@ process.on('SIGINT', async () => {
     logger.info('HTTP server closed');
   });
   
-  await redisClient.disconnect();
+  try {
+    await redisClient.disconnect();
+  } catch (error) {
+    logger.warn('Error disconnecting Redis:', error instanceof Error ? error.message : 'Unknown error');
+  }
   process.exit(0);
 });
 
