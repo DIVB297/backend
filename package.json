@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "nodemon src/app.ts",
     "build": "tsc",
-    "start": "echo 'Starting application...' && ls -la dist/ && node dist/app.js",
+    "start": "node dist/app.js",
     "ingest": "ts-node src/scripts/ingestNews.ts",
     "test": "jest"
   },
