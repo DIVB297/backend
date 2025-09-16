@@ -167,7 +167,82 @@ app.post('/api/debug/test-chromadb', async (req, res) => {
       success: false,
       error: 'ChromaDB connection failed',
       details: error instanceof Error ? error.message : 'Unknown error',
-      suggestion: 'Check if ChromaDB service is running and accessible'
+    });
+  }
+});
+
+// Initialize ChromaDB with sample data
+app.post('/api/debug/initialize-data', async (req, res) => {
+  try {
+    logger.info('Initializing ChromaDB with sample data...');
+    
+    const { embeddingService } = await import('./services/embeddingService');
+    
+    // Force initialize the vector store
+    await vectorStoreService.initialize();
+    
+    const sampleDocs = [
+      {
+        title: "RAG-Powered Chatbot Assignment",
+        content: "Build a RAG-Powered Chatbot for News Websites. This is an assignment for the role of Full Stack Developer at Voosh. You are required to create a simple full-stack chatbot that answers queries over a news corpus using a Retrieval-Augmented Generation (RAG) pipeline. The tech stack includes Node.js Express for backend, React with SCSS for frontend, Redis for caching, and vector databases for embeddings."
+      },
+      {
+        title: "Tech Stack and Requirements",
+        content: "The chatbot uses Google Gemini API for LLM responses, Jina Embeddings for document embedding, vector databases like Chroma or Qdrant for storage, Express.js for REST API, Socket.io for real-time chat, Redis for session management, and React with SCSS for the frontend interface."
+      },
+      {
+        title: "Full Stack Development Features",
+        content: "The application features include a RAG pipeline that ingests news articles, embeds them using AI models, stores in vector databases, retrieves relevant passages for queries, and generates responses using Gemini API. It supports session management, chat history, real-time streaming responses, and session clearing functionality."
+      },
+      {
+        title: "AI and Machine Learning Integration",
+        content: "The system leverages artificial intelligence and machine learning through embedding models, vector similarity search, and large language models. It demonstrates modern AI application development with retrieval-augmented generation, semantic search capabilities, and conversational AI interfaces."
+      },
+      {
+        title: "Modern Web Development Practices",
+        content: "The project showcases modern web development with TypeScript, React hooks, SCSS styling, REST API design, WebSocket communication, Redis caching, Docker containerization, and cloud deployment. It follows best practices for full-stack application development."
+      }
+    ];
+
+    let addedCount = 0;
+    for (const doc of sampleDocs) {
+      try {
+        const embedding = await embeddingService.generateEmbedding(`${doc.title}\n\n${doc.content}`);
+        const docId = `sample_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        
+        await vectorStoreService.addDocument({
+          id: docId,
+          articleId: docId,
+          content: doc.content,
+          metadata: {
+            title: doc.title,
+            url: `https://example.com/${docId}`,
+            publishedAt: new Date().toISOString(),
+            source: "Sample Data"
+          },
+          embedding: embedding
+        });
+        addedCount++;
+        logger.info(`Added sample document: ${doc.title}`);
+      } catch (docError) {
+        logger.error(`Failed to add document: ${doc.title}`, docError);
+      }
+    }
+    
+    const finalCount = await vectorStoreService.getDocumentCount();
+    res.json({ 
+      success: true,
+      message: `Successfully added ${addedCount} sample documents`, 
+      documentsAdded: addedCount,
+      totalDocuments: finalCount,
+      status: 'Data initialization complete'
+    });
+  } catch (error) {
+    logger.error('Data initialization failed:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Data initialization failed',
+      details: error instanceof Error ? error.message : 'Unknown error'
     });
   }
 });

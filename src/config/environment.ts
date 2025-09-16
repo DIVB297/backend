@@ -27,11 +27,16 @@ export const config = {
     password: process.env.DB_PASSWORD || '',
   },
   
-  // ChromaDB
+  // ChromaDB - Updated for Chroma Cloud
   chroma: {
     host: process.env.CHROMA_HOST || process.env.CHROMADB_HOST || 'localhost',
     port: parseInt(process.env.CHROMA_PORT || process.env.CHROMADB_PORT || '8000', 10),
-    url: process.env.CHROMA_URL || process.env.CHROMADB_URL || undefined, // Railway internal URL
+    url: process.env.CHROMA_URL || process.env.CHROMADB_URL || undefined,
+    // Chroma Cloud settings
+    apiKey: process.env.CHROMA_API_KEY || undefined,
+    tenant: process.env.CHROMA_TENANT || undefined,
+    database: process.env.CHROMA_DATABASE || 'news_db',
+    useCloud: Boolean(process.env.CHROMA_API_KEY), // Use cloud if API key is provided
   },
   
   // Session

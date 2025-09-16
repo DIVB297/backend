@@ -1,38 +1,42 @@
-import { ChromaClient } from 'chromadb';
+import { getNewsCollection } from '../config/chroma';
 import { config } from '../config/environment';
 import { SearchResult, EmbeddingVector } from '../types';
 import { embeddingService } from './embeddingService';
 import { logger } from '../utils/logger';
 
 export class VectorStoreService {
-  private client: ChromaClient;
-  private collection: any;
+  private collection: any = null;
   private collectionName = 'news_articles';
 
   constructor() {
-    // Create ChromaDB client with Railway environment variable support
-    const chromaUrl = config.chroma.url || `http://${config.chroma.host}:${config.chroma.port}`;
-    this.client = new ChromaClient({
-      path: chromaUrl,
-    });
+    // No need to initialize client here, it's handled in chroma.ts
   }
 
   async initialize(): Promise<void> {
     try {
-      logger.info(`Attempting to connect to ChromaDB at: ${config.chroma.url || `http://${config.chroma.host}:${config.chroma.port}`}`);
-      
-      // Get or create collection
-      this.collection = await this.client.getOrCreateCollection({
-        name: this.collectionName,
-        metadata: { description: 'News articles for RAG chatbot' },
-      });
-      logger.info('Vector store initialized successfully');
+      if (config.chroma.useCloud) {
+        logger.info('Connecting to Chroma Cloud...');
+        this.collection = await getNewsCollection();
+        logger.info('Chroma Cloud initialized successfully');
+      } else {
+        // Fallback to local ChromaDB (keeping original logic for backward compatibility)
+        const { ChromaClient } = await import('chromadb');
+        const chromaUrl = config.chroma.url || `http://${config.chroma.host}:${config.chroma.port}`;
+        const client = new ChromaClient({ path: chromaUrl });
+        
+        logger.info(`Attempting to connect to local ChromaDB at: ${chromaUrl}`);
+        this.collection = await client.getOrCreateCollection({
+          name: this.collectionName,
+          metadata: { description: 'News articles for RAG chatbot' },
+        });
+        logger.info('Local ChromaDB initialized successfully');
+      }
     } catch (error) {
       logger.error('Error initializing vector store:', error);
-      logger.warn('ChromaDB connection failed - RAG functionality will be limited');
+      logger.warn('Vector store connection failed - RAG functionality will be limited');
       
-      // Don't throw error, just log it and continue without ChromaDB
-      // This allows the application to start even if ChromaDB is not available
+      // Don't throw error, just log it and continue without vector store
+      // This allows the application to start even if vector store is not available
       this.collection = null;
     }
   }
@@ -163,18 +167,37 @@ export class VectorStoreService {
   }
 
   async clearCollection(): Promise<void> {
-    try {
-      // Try to delete the collection
-      try {
-        await this.client.deleteCollection({ name: this.collectionName });
-        logger.info('Vector store collection deleted');
-      } catch (deleteError) {
-        logger.warn('Collection might not exist, continuing with initialization');
-      }
-      
-      // Recreate the collection
+    if (!this.collection) {
       await this.initialize();
-      logger.info('Vector store collection cleared and recreated');
+    }
+
+    try {
+      // For Chroma Cloud, we can't easily delete collections, so we'll clear all documents
+      if (config.chroma.useCloud) {
+        logger.info('Clearing all documents from Chroma Cloud collection');
+        // Get all document IDs and delete them
+        const result = await this.collection.get();
+        if (result.ids && result.ids.length > 0) {
+          await this.collection.delete({ ids: result.ids });
+          logger.info(`Deleted ${result.ids.length} documents from collection`);
+        }
+      } else {
+        // For local ChromaDB, delete and recreate collection
+        try {
+          const { ChromaClient } = await import('chromadb');
+          const chromaUrl = config.chroma.url || `http://${config.chroma.host}:${config.chroma.port}`;
+          const client = new ChromaClient({ path: chromaUrl });
+          
+          await client.deleteCollection({ name: this.collectionName });
+          logger.info('Local ChromaDB collection deleted');
+        } catch (deleteError) {
+          logger.warn('Collection might not exist, continuing with initialization');
+        }
+        
+        // Recreate the collection
+        await this.initialize();
+        logger.info('Vector store collection cleared and recreated');
+      }
     } catch (error) {
       logger.error('Error clearing collection:', error);
       throw error;
