@@ -18,6 +18,9 @@ import { cronService } from './services/cronService';
 const app = express();
 const server = createServer(app);
 
+// Trust proxy for Railway deployment
+app.set('trust proxy', 1);
+
 // Define allowed origins for CORS
 const allowedOrigins: string[] = [
   'http://localhost:3000',
