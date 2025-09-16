@@ -204,10 +204,63 @@ class CronService {
     }
 
     try {
-      // Simple calculation based on interval
+      // Calculate next run time based on cron schedule
       const now = new Date();
-      const nextRun = new Date(now.getTime() + (config.news.cronInterval * 60 * 1000));
-      return nextRun;
+      const intervalMinutes = config.news.cronInterval;
+      
+      if (intervalMinutes < 60) {
+        // Every X minutes - find next occurrence
+        const currentMinutes = now.getMinutes();
+        const nextMinutes = Math.ceil(currentMinutes / intervalMinutes) * intervalMinutes;
+        const nextRun = new Date(now);
+        
+        if (nextMinutes >= 60) {
+          nextRun.setHours(nextRun.getHours() + 1);
+          nextRun.setMinutes(nextMinutes - 60);
+        } else {
+          nextRun.setMinutes(nextMinutes);
+        }
+        nextRun.setSeconds(0);
+        nextRun.setMilliseconds(0);
+        
+        return nextRun;
+      } else if (intervalMinutes === 60) {
+        // Every hour - next hour at minute 0
+        const nextRun = new Date(now);
+        nextRun.setHours(nextRun.getHours() + 1);
+        nextRun.setMinutes(0);
+        nextRun.setSeconds(0);
+        nextRun.setMilliseconds(0);
+        return nextRun;
+      } else if (intervalMinutes % 60 === 0) {
+        // Every X hours - find next occurrence
+        const hours = intervalMinutes / 60;
+        const currentHour = now.getHours();
+        
+        // Find the next hour that's divisible by the interval
+        let nextHour = currentHour;
+        do {
+          nextHour++;
+        } while (nextHour % hours !== 0);
+        
+        const nextRun = new Date(now);
+        
+        if (nextHour >= 24) {
+          nextRun.setDate(nextRun.getDate() + 1);
+          nextRun.setHours(nextHour - 24);
+        } else {
+          nextRun.setHours(nextHour);
+        }
+        nextRun.setMinutes(0);
+        nextRun.setSeconds(0);
+        nextRun.setMilliseconds(0);
+        
+        return nextRun;
+      } else {
+        // Complex intervals - simple approximation
+        const nextRun = new Date(now.getTime() + (intervalMinutes * 60 * 1000));
+        return nextRun;
+      }
     } catch (error) {
       logger.error('Error calculating next run time:', error);
       return null;
