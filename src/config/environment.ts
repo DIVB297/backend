@@ -58,6 +58,9 @@ export const config = {
       'https://feeds.bbci.co.uk/news/rss.xml',
     ],
     maxArticles: parseInt(process.env.MAX_ARTICLES_TO_INGEST || '50', 10),
+    // Cron job settings (in minutes, 120 = 2 hours)
+    cronInterval: parseInt(process.env.NEWS_CRON_INTERVAL || '120', 10),
+    enableCron: process.env.ENABLE_NEWS_CRON === 'true',
   },
   
   // Vector Search

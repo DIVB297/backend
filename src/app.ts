@@ -12,6 +12,8 @@ import { vectorStoreService } from './services/vectorStoreService';
 
 import { chatRoutes } from './routes/chatRoutes';
 import { sessionRoutes } from './routes/sessionRoutes';
+import { newsRoutes } from './routes/newsRoutes';
+import { cronService } from './services/cronService';
 
 const app = express();
 const server = createServer(app);
@@ -58,6 +60,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // API routes
 app.use('/api/chat', chatRoutes);
 app.use('/api/sessions', sessionRoutes);
+app.use('/api/news', newsRoutes);
 
 // Simple root endpoint
 app.get('/', (req, res) => {
@@ -65,7 +68,7 @@ app.get('/', (req, res) => {
     message: 'RAG Chatbot Backend API',
     status: 'running',
     version: '1.0.0',
-    endpoints: ['/api/health', '/api/chat', '/api/sessions']
+    endpoints: ['/api/health', '/api/chat', '/api/sessions', '/api/news']
   });
 });
 
@@ -319,6 +322,17 @@ async function startServer() {
       console.log('   ChromaDB Error:', error instanceof Error ? error.message : 'Unknown error');
       logger.warn('Vector store initialization failed - using fallback responses');
     }
+
+    // Initialize and start cron service
+    try {
+      await cronService.initialize();
+      cronService.startNewsIngestionCron();
+      console.log('✅ Cron service initialized and started');
+      logger.info('Cron service initialized and started');
+    } catch (error) {
+      console.log('⚠️  Cron service initialization failed:', error instanceof Error ? error.message : 'Unknown error');
+      logger.warn('Cron service initialization failed:', error instanceof Error ? error.message : 'Unknown error');
+    }
     
     // Start server
     server.listen(config.port, () => {
@@ -339,6 +353,9 @@ async function startServer() {
 process.on('SIGTERM', async () => {
   logger.info('SIGTERM received, shutting down gracefully');
   
+  // Stop cron service
+  cronService.stopNewsIngestionCron();
+  
   server.close(() => {
     logger.info('HTTP server closed');
   });
@@ -353,6 +370,9 @@ process.on('SIGTERM', async () => {
 
 process.on('SIGINT', async () => {
   logger.info('SIGINT received, shutting down gracefully');
+  
+  // Stop cron service
+  cronService.stopNewsIngestionCron();
   
   server.close(() => {
     logger.info('HTTP server closed');

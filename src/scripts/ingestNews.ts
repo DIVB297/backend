@@ -78,18 +78,36 @@ class NewsIngestionService {
 
   private async fetchArticlesFromRSS(rssUrl: string): Promise<NewsArticle[]> {
     try {
+      logger.info(`Fetching RSS feed from: ${rssUrl}`);
       const feed = await this.rssParser.parseURL(rssUrl);
+      logger.info(`RSS feed loaded, found ${feed.items?.length || 0} items`);
+      
       const articles: NewsArticle[] = [];
       
       for (const item of feed.items) {
-        if (!item.link || !item.title) continue;
+        if (!item.link || !item.title) {
+          logger.debug(`Skipping item without link or title: ${item.title || 'unknown'}`);
+          continue;
+        }
         
         // Skip if already processed
-        if (this.processedArticles.has(item.link)) continue;
+        if (this.processedArticles.has(item.link)) {
+          logger.debug(`Skipping already processed article: ${item.title}`);
+          continue;
+        }
         
         try {
-          const content = await this.extractArticleContent(item.link);
-          if (!content || content.length < 100) continue; // Skip articles with little content
+          let content = await this.extractArticleContent(item.link);
+          
+          // If content extraction fails or is too short, use the RSS description as fallback
+          if (!content || content.length < 100) {
+            content = item.content || item.description || '';
+            if (content.length < 50) {
+              logger.debug(`Skipping article with insufficient content: ${item.title} (${content?.length || 0} chars)`);
+              continue;
+            }
+            logger.debug(`Using RSS description as content for: ${item.title}`);
+          }
           
           const article: NewsArticle = {
             id: uuidv4(),
@@ -102,6 +120,7 @@ class NewsIngestionService {
           
           articles.push(article);
           this.processedArticles.set(item.link, true);
+          logger.debug(`Successfully processed article: ${item.title}`);
           
         } catch (error) {
           logger.warn(`Error processing article: ${item.link}`, error);
@@ -120,11 +139,13 @@ class NewsIngestionService {
 
   private async extractArticleContent(url: string): Promise<string> {
     try {
+      logger.debug(`Attempting to extract content from: ${url}`);
       const response = await axios.get(url, {
         timeout: 10000,
         headers: {
           'User-Agent': 'Mozilla/5.0 (compatible; RAG-Chatbot/1.0)',
         },
+        maxRedirects: 5,
       });
       
       const $ = cheerio.load(response.data);
@@ -143,19 +164,22 @@ class NewsIngestionService {
         '.content',
         'main',
         '.story-body',
-        '.article-content'
+        '.article-content',
+        '[data-component="text-block"]' // BBC specific
       ];
       
       for (const selector of selectors) {
         const element = $(selector);
         if (element.length && element.text().trim().length > content.length) {
           content = element.text().trim();
+          logger.debug(`Found content using selector: ${selector} (${content.length} chars)`);
         }
       }
       
       // If no specific content selector worked, try the body
       if (!content || content.length < 100) {
         content = $('body').text().trim();
+        logger.debug(`Using body content: ${content.length} chars`);
       }
       
       // Clean up the content
@@ -165,6 +189,7 @@ class NewsIngestionService {
         .trim()
         .substring(0, 5000); // Limit content length
       
+      logger.debug(`Final content length: ${content.length} chars`);
       return content;
       
     } catch (error) {
@@ -258,6 +283,10 @@ class NewsIngestionService {
   async clearAndReingest(): Promise<void> {
     logger.info('Clearing existing vector store...');
     await vectorStoreService.clearCollection();
+    
+    // Clear the processed articles map to allow re-ingesting the same articles
+    this.processedArticles.clear();
+    logger.info('Cleared processed articles cache...');
     
     logger.info('Starting fresh ingestion...');
     await this.ingestNewsArticles();
