@@ -99,53 +99,75 @@ app.get('/api/health', async (req, res) => {
   }
 });
 
-// Debug endpoint to manually initialize with sample data
-app.post('/api/debug/init-sample-data', async (req, res) => {
+// Debug endpoint to test ChromaDB connection and initialize with sample data
+app.post('/api/debug/test-chromadb', async (req, res) => {
   try {
+    logger.info('Testing ChromaDB connection...');
+    
+    // Test direct connection to ChromaDB
     const { embeddingService } = await import('./services/embeddingService');
-    const sampleDocs = [
-      {
-        title: "AI and Machine Learning Overview",
-        content: "Artificial Intelligence and Machine Learning are transforming industries by enabling computers to learn from data and make intelligent decisions. These technologies are being used in healthcare, finance, transportation, and many other sectors."
-      },
-      {
-        title: "The Future of Technology",
-        content: "Emerging technologies like quantum computing, blockchain, and advanced AI are shaping the future. These innovations promise to solve complex problems and create new opportunities across various industries."
-      },
-      {
-        title: "Sustainable Technology Solutions",
-        content: "Green technology and sustainable solutions are becoming increasingly important as we face climate change. Renewable energy, electric vehicles, and energy-efficient systems are leading the way toward a more sustainable future."
-      }
-    ];
-
-    for (const doc of sampleDocs) {
-      const embedding = await embeddingService.generateEmbedding(`${doc.title}\n\n${doc.content}`);
-      const docId = `sample_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      
-      await vectorStoreService.addDocument({
-        id: docId,
-        articleId: docId,
-        content: doc.content,
-        metadata: {
-          title: doc.title,
-          url: `https://example.com/${docId}`,
-          publishedAt: new Date().toISOString(),
-          source: "Sample Data"
-        },
-        embedding: embedding
-      });
-    }
-
+    
+    // Force initialize the vector store
+    await vectorStoreService.initialize();
+    
+    // Check if it worked
     const count = await vectorStoreService.getDocumentCount();
-    res.json({ 
-      message: 'Sample data initialized successfully', 
-      documentsCount: count 
-    });
+    
+    if (count >= 0) {
+      // ChromaDB is working, add sample data if empty
+      if (count === 0) {
+        const sampleDocs = [
+          {
+            title: "AI and Technology Overview",
+            content: "Artificial Intelligence and modern technology are revolutionizing how we work and live. From machine learning to automation, these technologies are creating new possibilities across industries."
+          },
+          {
+            title: "Sustainable Energy Solutions",
+            content: "Renewable energy sources like solar, wind, and hydroelectric power are becoming increasingly important for reducing carbon emissions and creating a sustainable future."
+          }
+        ];
+
+        for (const doc of sampleDocs) {
+          try {
+            const embedding = await embeddingService.generateEmbedding(`${doc.title}\n\n${doc.content}`);
+            const docId = `test_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            
+            await vectorStoreService.addDocument({
+              id: docId,
+              articleId: docId,
+              content: doc.content,
+              metadata: {
+                title: doc.title,
+                url: `https://example.com/${docId}`,
+                publishedAt: new Date().toISOString(),
+                source: "Test Data"
+              },
+              embedding: embedding
+            });
+            logger.info(`Added test document: ${doc.title}`);
+          } catch (docError) {
+            logger.error(`Failed to add document: ${doc.title}`, docError);
+          }
+        }
+      }
+      
+      const finalCount = await vectorStoreService.getDocumentCount();
+      res.json({ 
+        success: true,
+        message: 'ChromaDB connection successful', 
+        documentsCount: finalCount,
+        status: 'Connected and operational'
+      });
+    } else {
+      throw new Error('ChromaDB connection failed');
+    }
   } catch (error) {
-    logger.error('Error initializing sample data:', error);
+    logger.error('ChromaDB test failed:', error);
     res.status(500).json({ 
-      error: 'Failed to initialize sample data',
-      details: error instanceof Error ? error.message : 'Unknown error'
+      success: false,
+      error: 'ChromaDB connection failed',
+      details: error instanceof Error ? error.message : 'Unknown error',
+      suggestion: 'Check if ChromaDB service is running and accessible'
     });
   }
 });
