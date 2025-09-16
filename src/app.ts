@@ -212,19 +212,15 @@ async function startServer() {
       logger.warn('Redis connection failed, continuing without Redis:', error instanceof Error ? error.message : 'Unknown error');
     }
     
-    // Initialize Vector Store (REQUIRED for RAG functionality)
+    // Initialize Vector Store (optional - app can work without it)
     try {
       await vectorStoreService.initialize();
       console.log('✅ Vector store initialized successfully');
       logger.info('Vector store initialized successfully');
     } catch (error) {
-      console.error('❌ Vector store initialization FAILED - this is required for RAG functionality!');
-      console.error('Error:', error instanceof Error ? error.message : 'Unknown error');
-      logger.error('Vector store initialization FAILED:', error instanceof Error ? error.message : 'Unknown error');
-      
-      // Don't exit the process, but log that RAG won't work
-      console.log('⚠️  Continuing without vector store - RAG queries will return empty results');
-      logger.warn('Continuing without vector store - RAG queries will return empty results');
+      console.log('⚠️  Vector store initialization failed - app will use fallback responses');
+      console.log('   ChromaDB Error:', error instanceof Error ? error.message : 'Unknown error');
+      logger.warn('Vector store initialization failed - using fallback responses');
     }
     
     // Start server

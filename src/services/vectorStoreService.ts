@@ -19,25 +19,21 @@ export class VectorStoreService {
 
   async initialize(): Promise<void> {
     try {
+      logger.info(`Attempting to connect to ChromaDB at: ${config.chroma.url || `http://${config.chroma.host}:${config.chroma.port}`}`);
+      
       // Get or create collection
       this.collection = await this.client.getOrCreateCollection({
         name: this.collectionName,
         metadata: { description: 'News articles for RAG chatbot' },
       });
-      logger.info('Vector store initialized');
+      logger.info('Vector store initialized successfully');
     } catch (error) {
       logger.error('Error initializing vector store:', error);
-      // Fallback: try to create collection if it doesn't exist
-      try {
-        this.collection = await this.client.createCollection({
-          name: this.collectionName,
-          metadata: { description: 'News articles for RAG chatbot' },
-        });
-        logger.info('Vector store collection created');
-      } catch (createError) {
-        logger.error('Error creating collection:', createError);
-        throw error;
-      }
+      logger.warn('ChromaDB connection failed - RAG functionality will be limited');
+      
+      // Don't throw error, just log it and continue without ChromaDB
+      // This allows the application to start even if ChromaDB is not available
+      this.collection = null;
     }
   }
 
@@ -73,15 +69,15 @@ export class VectorStoreService {
 
   async searchSimilar(queryText: string, topK: number = config.vectorSearch.topK): Promise<SearchResult[]> {
     try {
-      // Ensure collection is initialized
+      // Check if ChromaDB is available at all
       if (!this.collection) {
-        logger.warn('Collection not initialized, attempting to initialize...');
+        logger.warn('ChromaDB not available, attempting to reconnect...');
         await this.initialize();
       }
 
       if (!this.collection) {
-        logger.error('Failed to initialize collection, returning empty results');
-        return [];
+        logger.warn('ChromaDB unavailable, returning fallback response');
+        return this.getFallbackResponse(queryText);
       }
 
       // Generate embedding for the query
@@ -90,8 +86,8 @@ export class VectorStoreService {
       // Check if collection has any documents
       const count = await this.getDocumentCount();
       if (count === 0) {
-        logger.warn('Collection is empty, cannot search for similar documents');
-        return [];
+        logger.warn('Collection is empty, returning fallback response');
+        return this.getFallbackResponse(queryText);
       }
       
       const results = await this.collection.query({
@@ -121,8 +117,8 @@ export class VectorStoreService {
       return searchResults;
     } catch (error) {
       logger.error('Error searching similar documents:', error);
-      // Return empty results instead of throwing
-      return [];
+      // Return fallback response instead of empty array
+      return this.getFallbackResponse(queryText);
     }
   }
 
@@ -148,6 +144,22 @@ export class VectorStoreService {
       logger.error('Error getting document count:', error);
       return 0;
     }
+  }
+
+  private getFallbackResponse(queryText: string): SearchResult[] {
+    // Return a generic helpful response when ChromaDB is not available
+    return [
+      {
+        articleId: 'fallback-001',
+        content: `I apologize, but I'm currently unable to access my knowledge base to provide specific information about "${queryText}". This might be due to a temporary service issue. Please try again in a moment, or feel free to ask your question in a different way.`,
+        score: 0.5,
+        metadata: {
+          title: 'Service Temporarily Unavailable',
+          source: 'System Message',
+          publishedAt: new Date().toISOString(),
+        }
+      }
+    ];
   }
 
   async clearCollection(): Promise<void> {
