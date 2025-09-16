@@ -204,56 +204,56 @@ class CronService {
     }
 
     try {
-      // Calculate next run time based on cron schedule
+      // Calculate next run time based on cron schedule (cron runs in UTC)
       const now = new Date();
       const intervalMinutes = config.news.cronInterval;
       
       if (intervalMinutes < 60) {
         // Every X minutes - find next occurrence
-        const currentMinutes = now.getMinutes();
+        const currentMinutes = now.getUTCMinutes();
         const nextMinutes = Math.ceil(currentMinutes / intervalMinutes) * intervalMinutes;
         const nextRun = new Date(now);
         
         if (nextMinutes >= 60) {
-          nextRun.setHours(nextRun.getHours() + 1);
-          nextRun.setMinutes(nextMinutes - 60);
+          nextRun.setUTCHours(nextRun.getUTCHours() + 1);
+          nextRun.setUTCMinutes(nextMinutes - 60);
         } else {
-          nextRun.setMinutes(nextMinutes);
+          nextRun.setUTCMinutes(nextMinutes);
         }
-        nextRun.setSeconds(0);
-        nextRun.setMilliseconds(0);
+        nextRun.setUTCSeconds(0);
+        nextRun.setUTCMilliseconds(0);
         
         return nextRun;
       } else if (intervalMinutes === 60) {
         // Every hour - next hour at minute 0
         const nextRun = new Date(now);
-        nextRun.setHours(nextRun.getHours() + 1);
-        nextRun.setMinutes(0);
-        nextRun.setSeconds(0);
-        nextRun.setMilliseconds(0);
+        nextRun.setUTCHours(nextRun.getUTCHours() + 1);
+        nextRun.setUTCMinutes(0);
+        nextRun.setUTCSeconds(0);
+        nextRun.setUTCMilliseconds(0);
         return nextRun;
       } else if (intervalMinutes % 60 === 0) {
-        // Every X hours - find next occurrence
+        // Every X hours - find next occurrence (using UTC since cron runs in UTC)
         const hours = intervalMinutes / 60;
-        const currentHour = now.getHours();
+        const currentHourUTC = now.getUTCHours();
         
         // Find the next hour that's divisible by the interval
-        let nextHour = currentHour;
+        let nextHourUTC = currentHourUTC;
         do {
-          nextHour++;
-        } while (nextHour % hours !== 0);
+          nextHourUTC++;
+        } while (nextHourUTC % hours !== 0);
         
         const nextRun = new Date(now);
         
-        if (nextHour >= 24) {
-          nextRun.setDate(nextRun.getDate() + 1);
-          nextRun.setHours(nextHour - 24);
+        if (nextHourUTC >= 24) {
+          nextRun.setUTCDate(nextRun.getUTCDate() + 1);
+          nextRun.setUTCHours(nextHourUTC - 24);
         } else {
-          nextRun.setHours(nextHour);
+          nextRun.setUTCHours(nextHourUTC);
         }
-        nextRun.setMinutes(0);
-        nextRun.setSeconds(0);
-        nextRun.setMilliseconds(0);
+        nextRun.setUTCMinutes(0);
+        nextRun.setUTCSeconds(0);
+        nextRun.setUTCMilliseconds(0);
         
         return nextRun;
       } else {
