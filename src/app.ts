@@ -99,6 +99,57 @@ app.get('/api/health', async (req, res) => {
   }
 });
 
+// Debug endpoint to manually initialize with sample data
+app.post('/api/debug/init-sample-data', async (req, res) => {
+  try {
+    const { embeddingService } = await import('./services/embeddingService');
+    const sampleDocs = [
+      {
+        title: "AI and Machine Learning Overview",
+        content: "Artificial Intelligence and Machine Learning are transforming industries by enabling computers to learn from data and make intelligent decisions. These technologies are being used in healthcare, finance, transportation, and many other sectors."
+      },
+      {
+        title: "The Future of Technology",
+        content: "Emerging technologies like quantum computing, blockchain, and advanced AI are shaping the future. These innovations promise to solve complex problems and create new opportunities across various industries."
+      },
+      {
+        title: "Sustainable Technology Solutions",
+        content: "Green technology and sustainable solutions are becoming increasingly important as we face climate change. Renewable energy, electric vehicles, and energy-efficient systems are leading the way toward a more sustainable future."
+      }
+    ];
+
+    for (const doc of sampleDocs) {
+      const embedding = await embeddingService.generateEmbedding(`${doc.title}\n\n${doc.content}`);
+      const docId = `sample_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      await vectorStoreService.addDocument({
+        id: docId,
+        articleId: docId,
+        content: doc.content,
+        metadata: {
+          title: doc.title,
+          url: `https://example.com/${docId}`,
+          publishedAt: new Date().toISOString(),
+          source: "Sample Data"
+        },
+        embedding: embedding
+      });
+    }
+
+    const count = await vectorStoreService.getDocumentCount();
+    res.json({ 
+      message: 'Sample data initialized successfully', 
+      documentsCount: count 
+    });
+  } catch (error) {
+    logger.error('Error initializing sample data:', error);
+    res.status(500).json({ 
+      error: 'Failed to initialize sample data',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
 // Socket.IO for real-time chat
 io.on('connection', (socket) => {
   logger.info(`Client connected: ${socket.id}`);
