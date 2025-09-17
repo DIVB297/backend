@@ -7,23 +7,42 @@ class RedisClient {
   private connected: boolean = false;
 
   constructor() {
-    // Disable Redis for now to avoid authentication issues
-    // The application will work without Redis (no caching/sessions)
-    this.client = createClient({
-      socket: {
-        host: 'localhost',
-        port: 6379,
-      },
-    });
-    this.connected = false; // Always stay disconnected
+    const redisUrl = config.redis?.url || process.env.REDIS_URL || 'redis://localhost:6379';
     
-    // Don't set up event listeners since we won't connect
-    logger.info('Redis disabled - application will run without caching');
+    this.client = createClient({
+      url: redisUrl,
+    });
+    
+    this.client.on('error', (err) => {
+      logger.error('Redis Client Error:', err);
+      this.connected = false;
+    });
+
+    this.client.on('connect', () => {
+      logger.info('Redis connected successfully');
+      this.connected = true;
+    });
+
+    this.client.on('disconnect', () => {
+      logger.info('Redis disconnected');
+      this.connected = false;
+    });
+    
+    logger.info(`Redis client initialized with URL: ${redisUrl}`);
   }
 
   async connect(): Promise<void> {
-    // Redis is disabled - do nothing
-    logger.info('Redis connection skipped (Redis disabled)');
+    try {
+      if (!this.connected && !this.client.isOpen) {
+        await this.client.connect();
+        this.connected = true;
+        logger.info('Redis connected successfully');
+      }
+    } catch (error) {
+      logger.error('Failed to connect to Redis:', error);
+      this.connected = false;
+      // Don't throw error - let the app continue without Redis
+    }
   }
 
   async disconnect(): Promise<void> {
